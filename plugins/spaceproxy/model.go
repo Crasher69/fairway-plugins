@@ -85,3 +85,9 @@ func parseTime(s string) (time.Time, error) {
 	s = strings.Replace(strings.TrimSpace(s), " ", "T", 1)
 	return time.Parse(time.RFC3339Nano, s)
 }
+
+// balance — ответ /api/balance/: {"balance":21.41,"partner_balance":0.0}.
+type balance struct {
+	Balance        float64 `json:"balance"`
+	PartnerBalance float64 `json:"partner_balance"`
+}

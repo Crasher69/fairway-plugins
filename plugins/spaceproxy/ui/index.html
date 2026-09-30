@@ -51,7 +51,7 @@
   const T = {
     'Sync now': 'Синхронизировать', 'Select expiring': 'Выбрать истекающие', 'Clear': 'Снять выбор',
     'Renew': 'Продлить', 'Cancel': 'Отмена', 'Address': 'Адрес', 'Ends': 'Окончание', 'Left': 'Осталось',
-    'Lists': 'Листы', 'Balance': 'Баланс', 'Synced': 'Синхронизировано', 'Loading…': 'Загрузка…',
+    'Lists': 'Листы', 'Balance': 'Баланс', 'Partner balance': 'Партнёрский', 'Synced': 'Синхронизировано', 'Loading…': 'Загрузка…',
     'No proxies in the account.': 'В аккаунте нет прокси.', 'selected': 'выбрано',
   };
   const t = s => ru && T[s] || s;
@@ -60,6 +60,7 @@
   const $ = id => document.getElementById(id);
   const picked = new Set();
   let data = null;
+  let balanceText = '';
 
   function daysText(p) {
     if (!p.date_end) return '?';
@@ -177,8 +178,11 @@
   async function balance() {
     try {
       const b = await fairway.call('balance');
-      const parts = Object.entries(b || {}).filter(([, v]) => typeof v !== 'object').map(([k, v]) => `${k}: ${v}`);
-      $('balance').textContent = parts.length ? `${t('Balance')} — ${parts.join(', ')}` : '';
+      const money = v => Number(v).toLocaleString(fairway.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      let text = `${t('Balance')}: ${money(b.balance)}`;
+      if (b.partner_balance) text += ` · ${t('Partner balance')}: ${money(b.partner_balance)}`;
+      balanceText = text;
+      $('balance').textContent = text;
     } catch (err) {
       $('balance').textContent = '';
     }
@@ -191,6 +195,7 @@
     $('confirm-text').textContent = ru
       ? `Продлить ${picked.size} прокси на ${data.period} дней? Деньги спишутся с баланса spaceproxy.`
       : `Renew ${picked.size} proxies for ${data.period} days? This is charged to your spaceproxy balance.`;
+    if (balanceText) $('confirm-text').textContent += ` ${balanceText}.`;
     $('confirm').hidden = false;
   };
   $('confirm-no').onclick = () => { $('confirm').hidden = true; };

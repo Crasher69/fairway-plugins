@@ -194,7 +194,11 @@ func call(method string, params json.RawMessage) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return json.RawMessage(body), nil
+		var b balance
+		if err := json.Unmarshal(body, &b); err != nil {
+			return nil, fmt.Errorf("balance: %w", err)
+		}
+		return b, nil
 	case "renew":
 		var p struct {
 			IDs []int64 `json:"ids"`

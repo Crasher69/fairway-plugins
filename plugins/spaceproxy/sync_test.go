@@ -211,3 +211,13 @@ func TestParseSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBalance(t *testing.T) {
+	var b balance
+	if err := json.Unmarshal([]byte(`{"balance":21.41,"partner_balance":0.0}`), &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.Balance != 21.41 || b.PartnerBalance != 0 {
+		t.Fatalf("%+v", b)
+	}
+}
