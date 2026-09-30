@@ -1,9 +1,11 @@
-package main
+// Package countries — названия стран по-русски для имён прокси и
+// страниц плагинов.
+package countries
 
 import "strings"
 
-// countryRU — названия стран по-русски по коду из API (ISO 3166-1 alpha-2).
-var countryRU = map[string]string{
+// RU — названия стран по-русски по коду из API (ISO 3166-1 alpha-2).
+var RU = map[string]string{
 	"RU": "Россия",
 	"DE": "Германия",
 	"US": "США",
@@ -139,14 +141,14 @@ var countryRU = map[string]string{
 	"JM": "Ямайка",
 }
 
-// countryName — название страны для имени прокси; неизвестный код остаётся
+// Name — название страны для имени прокси; неизвестный код остаётся
 // кодом.
-func countryName(code string) string {
+func Name(code string) string {
 	code = strings.ToUpper(code)
 	if code == "" {
 		return ""
 	}
-	if name, ok := countryRU[code]; ok {
+	if name, ok := RU[code]; ok {
 		return name
 	}
 	return code

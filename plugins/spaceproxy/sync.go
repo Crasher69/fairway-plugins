@@ -9,6 +9,8 @@ import (
 	"time"
 
 	fairway "github.com/Crasher69/fairway/plugin-sdk"
+
+	"github.com/Crasher69/fairway-plugins/internal/countries"
 )
 
 // idPrefix — id прокси в fairway = idPrefix + id в spaceproxy. По нему
@@ -218,7 +220,7 @@ func toProxy(p apiProxy, scheme string, st state, end time.Time) fairway.Proxy {
 // defaultName — имя нового прокси: страна и id в сервисе, «США-369160».
 // Без страны — id в fairway.
 func defaultName(p fairway.Proxy) string {
-	country := countryName(p.Country)
+	country := countries.Name(p.Country)
 	if country == "" {
 		return p.ID
 	}
