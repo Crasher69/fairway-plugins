@@ -1,0 +1,52 @@
+# Релиз плагина по тегу <имя>-v<версия>, например hello-v0.1.0. Версия в
+# теге должна совпадать с version в plugins/<имя>/manifest.json.
+#
+#   git tag hello-v0.1.0 && git push origin hello-v0.1.0
+#
+# К GitHub Release прикрепляются <имя>-<версия>.zip (внутри готовая папка
+# <имя>/ для <data>/plugins) и SHA256SUMS.
+name: Release
+
+on:
+  push:
+    tags: ["*-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: parse tag
+        id: tag
+        run: |
+          tag="$GITHUB_REF_NAME"
+          name="${tag%-v*}"
+          version="${tag##*-v}"
+          manifest="plugins/$name/manifest.json"
+          [ -f "$manifest" ] || { echo "no plugin $name for tag $tag"; exit 1; }
+          have=$(jq -r .version "$manifest")
+          [ "$have" = "$version" ] || { echo "tag version $version != manifest version $have"; exit 1; }
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: build
+        run: ./build.sh "${{ steps.tag.outputs.name }}"
+
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.tag.outputs.name }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          cd dist
+          sha256sum "$NAME-$VERSION.zip" > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" "$NAME-$VERSION.zip" SHA256SUMS \
+            --title "$NAME $VERSION" --generate-notes
