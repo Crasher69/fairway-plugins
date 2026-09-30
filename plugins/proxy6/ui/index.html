@@ -1,0 +1,227 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Страница плагина proxy6 в панели: прокси аккаунта по странам,
+     даты окончания, продление. Один файл, открывается в изолированном
+     iframe без модальных окон, поэтому подтверждение — своё, на странице. -->
+<style>
+  :root { color-scheme: light dark; font: 14px/1.5 system-ui, sans-serif; --line: #8884; --muted: #888; --warn: #c77a00; --bad: #c22f2f; --ok: #2f8a3c; }
+  body { margin: 0; padding: 16px 20px; background: transparent; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+  .bar .grow { flex: 1; }
+  .muted { color: var(--muted); }
+  button { font: inherit; padding: 5px 12px; border-radius: 8px; border: 1px solid #8886; background: none; color: inherit; cursor: pointer; }
+  button.primary { background: #2f6fde; border-color: #2f6fde; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  section { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+  section .head { padding: 8px 12px; display: flex; gap: 10px; align-items: center; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th:first-child { width: 28px; }
+  th, td { text-align: left; padding: 4px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 500; color: var(--muted); }
+  td.lists { white-space: normal; }
+  .soon { color: var(--warn); }
+  .grace, .gone { color: var(--bad); }
+  .error { color: var(--bad); white-space: pre-wrap; }
+  .done { color: var(--ok); }
+  #confirm { padding: 10px 12px; border: 1px solid var(--warn); border-radius: 10px; margin-bottom: 12px; }
+</style>
+
+<div class="bar">
+  <span id="balance" class="muted"></span>
+  <span id="synced" class="muted grow"></span>
+  <button id="sync" data-t="Sync now">Sync now</button>
+</div>
+<div class="bar">
+  <button id="pick-soon" data-t="Select expiring">Select expiring</button>
+  <button id="pick-none" data-t="Clear">Clear</button>
+  <span id="picked" class="muted grow"></span>
+  <button id="renew" class="primary" disabled></button>
+</div>
+<div id="confirm" hidden>
+  <span id="confirm-text"></span>
+  <button id="confirm-yes" class="primary" data-t="Renew">Renew</button>
+  <button id="confirm-no" data-t="Cancel">Cancel</button>
+</div>
+<p id="message" hidden></p>
+<div id="groups"></div>
+
+<script>
+  const ru = fairway.lang === 'ru';
+  // Названия стран: по-русски — из плагина (как в именах прокси), иначе —
+  // из браузера; неизвестный код остаётся кодом.
+  let regions = null;
+  try { regions = new Intl.DisplayNames([fairway.lang || 'en'], { type: 'region' }); } catch (e) { /* old browser */ }
+  const countryName = (p) => {
+    if (!p.country) return '—';
+    if (ru && p.country_ru) return p.country_ru;
+    try { return (regions && regions.of(p.country)) || p.country; } catch (e) { return p.country; }
+  };
+  const T = {
+    'Sync now': 'Синхронизировать', 'Select expiring': 'Выбрать истекающие', 'Clear': 'Снять выбор',
+    'Renew': 'Продлить', 'Cancel': 'Отмена', 'Address': 'Адрес', 'Ends': 'Окончание', 'Left': 'Осталось',
+    'Lists': 'Листы', 'Type': 'Тип', 'Balance': 'Баланс', 'Synced': 'Синхронизировано', 'Loading…': 'Загрузка…',
+    'No proxies in the account.': 'В аккаунте нет прокси.', 'selected': 'выбрано',
+  };
+  const t = s => ru && T[s] || s;
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.dataset.t);
+
+  const $ = id => document.getElementById(id);
+  const picked = new Set();
+  let data = null;
+  let balanceText = '';
+
+  function daysText(p) {
+    if (!p.date_end) return '?';
+    const d = p.days_left;
+    if (d >= 1) return ru ? `${Math.floor(d)} дн.` : `${Math.floor(d)} d`;
+    if (d > 0) return ru ? `${Math.max(1, Math.round(d * 24))} ч` : `${Math.max(1, Math.round(d * 24))} h`;
+    return ru ? `истёк ${Math.ceil(-d)} дн. назад` : `expired ${Math.ceil(-d)} d ago`;
+  }
+  function stateClass(p) {
+    if (p.state !== 'active') return p.state || 'gone';
+    return p.days_left < data.grace_days ? 'soon' : '';
+  }
+  // Истекающие — те, что закончатся в ближайшие grace_days дней, и уже истёкшие.
+  const expiring = p => p.state === 'grace' || (p.state === 'active' && p.days_left < data.grace_days);
+
+  function show(message, cls) {
+    const el = $('message');
+    el.textContent = message;
+    el.className = cls || '';
+    el.hidden = !message;
+  }
+
+  function render() {
+    const groups = $('groups');
+    groups.textContent = '';
+    const synced = data.synced_at ? new Date(data.synced_at).toLocaleString(fairway.lang) : '—';
+    $('synced').textContent = `${t('Synced')}: ${synced}`;
+    if (data.error) show(data.error, 'error');
+    if (!data.proxies.length) {
+      groups.textContent = t('No proxies in the account.');
+    }
+    const byCountry = new Map();
+    for (const p of data.proxies) {
+      const key = countryName(p);
+      if (!byCountry.has(key)) byCountry.set(key, []);
+      byCountry.get(key).push(p);
+    }
+    for (const [country, list] of [...byCountry].sort((a, b) => a[0].localeCompare(b[0], fairway.lang))) {
+      const box = document.createElement('section');
+      const summary = document.createElement('div');
+      summary.className = 'head';
+      const all = document.createElement('input');
+      all.type = 'checkbox';
+      all.checked = list.every(p => picked.has(p.id));
+      all.onclick = () => {
+        for (const p of list) all.checked ? picked.add(p.id) : picked.delete(p.id);
+        render();
+      };
+      const name = document.createElement('b');
+      name.textContent = country;
+      const soon = list.filter(expiring).length;
+      const info = document.createElement('span');
+      info.className = 'muted';
+      info.textContent = `${list.length}` + (soon ? (ru ? ` · истекают: ${soon}` : ` · expiring: ${soon}`) : '');
+      summary.append(all, name, info);
+      box.append(summary);
+
+      const table = document.createElement('table');
+      table.innerHTML = `<tr><th></th><th>${t('Address')}</th><th>${t('Type')}</th><th>${t('Ends')}</th><th>${t('Left')}</th><th>${t('Lists')}</th></tr>`;
+      for (const p of list) {
+        const tr = document.createElement('tr');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = picked.has(p.id);
+        box.onchange = () => { box.checked ? picked.add(p.id) : picked.delete(p.id); render(); };
+        const cells = [
+          p.address, `${p.kind} · ${p.scheme}` + (p.descr ? ` · ${p.descr}` : ''),
+          p.date_end ? new Date(p.date_end).toLocaleDateString(fairway.lang) : '?',
+          daysText(p), (p.lists || []).join(', '),
+        ];
+        const first = document.createElement('td');
+        first.append(box);
+        tr.append(first);
+        cells.forEach((text, i) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (i === 3) td.className = stateClass(p);
+          if (i === 4) td.className = 'lists muted';
+          tr.append(td);
+        });
+        table.append(tr);
+      }
+      box.append(table);
+      groups.append(box);
+    }
+    $('picked').textContent = picked.size ? `${t('selected')}: ${picked.size}` : '';
+    const renew = $('renew');
+    renew.disabled = !picked.size;
+    renew.textContent = ru ? `Продлить на ${data.period} дней` : `Renew for ${data.period} days`;
+  }
+
+  async function run(method, params) {
+    for (const b of document.querySelectorAll('button')) b.disabled = true;
+    try {
+      return await fairway.call(method, params);
+    } finally {
+      for (const b of document.querySelectorAll('button')) b.disabled = false;
+      if (data) render();
+    }
+  }
+
+  async function load(method) {
+    show(t('Loading…'), 'muted');
+    try {
+      data = await run(method);
+      for (const id of [...picked]) if (!data.proxies.some(p => p.id === id)) picked.delete(id);
+      show('');
+      render();
+      balance();
+    } catch (err) {
+      show(err.message, 'error');
+    }
+  }
+
+  const money = (v, cur) => Number(v).toLocaleString(fairway.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (cur ? ` ${cur}` : '');
+  // Баланс приходит с каждым ответом API, плагин отдаёт его вместе со списком.
+  function balance() {
+    balanceText = data && data.currency ? `${t('Balance')}: ${money(data.balance, data.currency)}` : '';
+    $('balance').textContent = balanceText;
+  }
+
+  $('sync').onclick = () => load('sync');
+  $('pick-soon').onclick = () => { for (const p of data.proxies) if (expiring(p)) picked.add(p.id); render(); };
+  $('pick-none').onclick = () => { picked.clear(); render(); };
+  $('renew').onclick = async () => {
+    const ids = [...picked];
+    let cost = '';
+    try {
+      const p = await run('price', { ids });
+      cost = ru ? ` Стоимость: около ${money(p.price, p.currency)}.` : ` Cost: about ${money(p.price, p.currency)}.`;
+    } catch (err) {
+      cost = ru ? ` Цену узнать не вышло: ${err.message}.` : ` Could not get the price: ${err.message}.`;
+    }
+    $('confirm-text').textContent = (ru
+      ? `Продлить ${ids.length} прокси на ${data.period} дней? Деньги спишутся с баланса proxy6.`
+      : `Renew ${ids.length} proxies for ${data.period} days? This is charged to your proxy6 balance.`) + cost;
+    if (balanceText) $('confirm-text').textContent += ` ${balanceText}.`;
+    $('confirm').hidden = false;
+  };
+  $('confirm-no').onclick = () => { $('confirm').hidden = true; };
+  $('confirm-yes').onclick = async () => {
+    $('confirm').hidden = true;
+    const ids = [...picked];
+    try {
+      const res = await run('renew', { ids });
+      picked.clear();
+      await load('list');
+      show(ru ? `Продлено: ${res.renewed}, списано ${money(res.price, res.currency)}, заказ ${res.order_id}.`
+              : `Renewed: ${res.renewed}, charged ${money(res.price, res.currency)}, order ${res.order_id}.`, 'done');
+    } catch (err) {
+      show(err.message, 'error');
+    }
+  };
+
+  load('list');
+</script>

@@ -1,0 +1,119 @@
+{
+  "name": "proxy6",
+  "version": "0.1.0",
+  "title": "Proxy6",
+  "description": "Keeps proxies from your proxy6.net account in the config: adds active ones, removes expired and deleted ones, renews from its page.",
+  "i18n": {
+    "ru": {
+      "title": "Proxy6",
+      "description": "Держит прокси из аккаунта proxy6.net в конфиге: добавляет активные, убирает истёкшие и удалённые, продлевает со своей страницы."
+    }
+  },
+  "kind": "base",
+  "permissions": [
+    "config.read",
+    "config.write",
+    "schedule",
+    "http.fetch"
+  ],
+  "http_hosts": [
+    "px6.link"
+  ],
+  "settings_schema": {
+    "type": "object",
+    "required": [
+      "api_key"
+    ],
+    "properties": {
+      "api_key": {
+        "type": "string",
+        "title": "API key",
+        "description": "Key from proxy6.net, the \"API\" section of the account.",
+        "format": "password",
+        "i18n": {
+          "ru": {
+            "title": "Ключ API",
+            "description": "Ключ из proxy6.net, раздел «API» в личном кабинете."
+          }
+        }
+      },
+      "list": {
+        "type": "string",
+        "title": "List",
+        "description": "List for new proxies; created if missing. Empty: add to the proxy catalog only.",
+        "default": "proxy6",
+        "i18n": {
+          "ru": {
+            "title": "Лист",
+            "description": "Лист для новых прокси; если его нет, создаётся. Пусто: только в каталог прокси."
+          }
+        }
+      },
+      "scheme": {
+        "type": "string",
+        "title": "Protocol for \"auto\" proxies",
+        "description": "Proxies of type auto accept HTTP and SOCKS5 on one port; others use the protocol set in proxy6.",
+        "enum": [
+          "http",
+          "socks5"
+        ],
+        "default": "http",
+        "i18n": {
+          "ru": {
+            "title": "Протокол для прокси «auto»",
+            "description": "Прокси с типом auto принимают HTTP и SOCKS5 на одном порту; у остальных протокол из proxy6."
+          }
+        }
+      },
+      "interval": {
+        "type": "string",
+        "title": "Sync interval",
+        "description": "How often to sync: 5m, 10m, 1h. At least 1m.",
+        "default": "10m",
+        "i18n": {
+          "ru": {
+            "title": "Интервал синхронизации",
+            "description": "Как часто синхронизировать: 5m, 10m, 1h. Не меньше 1m."
+          }
+        }
+      },
+      "grace_days": {
+        "type": "integer",
+        "title": "Days to keep expired",
+        "description": "An expired proxy stays untouched this many days, then it is removed from lists and the catalog.",
+        "default": 3,
+        "minimum": 0,
+        "i18n": {
+          "ru": {
+            "title": "Сколько дней держать истёкшие",
+            "description": "Истёкший прокси не трогаем столько дней, потом он убирается из листов и каталога."
+          }
+        }
+      },
+      "via_fairway": {
+        "type": "boolean",
+        "title": "Go to the API through fairway",
+        "description": "Requests to px6.link go through fairway's own proxy and use the list of its domain rule.",
+        "default": false,
+        "i18n": {
+          "ru": {
+            "title": "Ходить к API через fairway",
+            "description": "Запросы к px6.link идут через прокси самого fairway, по листу его правила для домена."
+          }
+        }
+      },
+      "direct_fallback": {
+        "type": "boolean",
+        "title": "Fall back to direct",
+        "description": "If the request through fairway fails with a network error, retry directly.",
+        "default": false,
+        "i18n": {
+          "ru": {
+            "title": "Если не вышло, напрямую",
+            "description": "Если запрос через fairway не прошёл из-за сети, повторить напрямую."
+          }
+        }
+      }
+    }
+  }
+}
