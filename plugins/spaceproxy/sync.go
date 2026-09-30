@@ -156,6 +156,11 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 		}
 		updated := t.proxy
 		updated.Name = p.Name // имя — дело человека
+		if p.Name == p.ID {
+			// Старое имя по умолчанию (spaceproxy-<id>) меняем на новое.
+			updated.Name = uniqueName(defaultName(t.proxy), names)
+			names[updated.Name] = true
+		}
 		if updated != p {
 			r.Updated = append(r.Updated, p.ID)
 		}
@@ -172,7 +177,7 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 	sort.Slice(added, func(i, j int) bool { return idLess(added[i], added[j]) })
 	for _, id := range added {
 		p := want[id].proxy
-		p.Name = uniqueName(id, names)
+		p.Name = uniqueName(defaultName(p), names)
 		names[p.Name] = true
 		proxies = append(proxies, p)
 	}
@@ -210,12 +215,21 @@ func toProxy(p apiProxy, scheme string, st state, end time.Time) fairway.Proxy {
 	}
 }
 
-// uniqueName — имя нового прокси: его id, а если такое имя уже занято
-// прокси, заведённым руками, — с номером.
-func uniqueName(id string, taken map[string]bool) string {
-	name := id
+// defaultName — имя нового прокси: страна и id в сервисе, «США-369160».
+// Без страны — id в fairway.
+func defaultName(p fairway.Proxy) string {
+	country := countryName(p.Country)
+	if country == "" {
+		return p.ID
+	}
+	return country + "-" + strings.TrimPrefix(p.ID, idPrefix)
+}
+
+// uniqueName — base, а если такое имя уже занято — с номером.
+func uniqueName(base string, taken map[string]bool) string {
+	name := base
 	for n := 2; taken[name]; n++ {
-		name = fmt.Sprintf("%s-%d", id, n)
+		name = fmt.Sprintf("%s-%d", base, n)
 	}
 	return name
 }

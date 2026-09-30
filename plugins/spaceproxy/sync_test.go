@@ -84,7 +84,7 @@ func TestPlanAddsActiveOnly(t *testing.T) {
 		t.Fatalf("чужой лист %v", got)
 	}
 	p := proxies[1]
-	want := fairway.Proxy{ID: "spaceproxy-1", Name: "spaceproxy-1", Scheme: "http", Host: "10.0.0.1", Port: 8000,
+	want := fairway.Proxy{ID: "spaceproxy-1", Name: "Германия-1", Scheme: "http", Host: "10.0.0.1", Port: 8000,
 		Login: "u", Password: "p", Country: "DE", Comment: "spaceproxy · до 2026-10-05"}
 	if p != want {
 		t.Fatalf("прокси\n%+v\nwant\n%+v", p, want)
@@ -193,10 +193,33 @@ func TestPlanSafety(t *testing.T) {
 }
 
 func TestPlanNameCollision(t *testing.T) {
-	cfg := &fairway.Config{Proxies: []fairway.Proxy{{ID: "x", Name: "spaceproxy-1"}}}
+	cfg := &fairway.Config{Proxies: []fairway.Proxy{{ID: "x", Name: "Германия-1"}}}
 	proxies, _, _ := plan(cfg, []apiProxy{proxy(1, 5)}, nil, defaults(), now)
-	if proxies[1].Name != "spaceproxy-1-2" {
+	if proxies[1].Name != "Германия-1-2" {
 		t.Fatalf("имя %q", proxies[1].Name)
+	}
+}
+
+func TestPlanRenamesOldDefault(t *testing.T) {
+	old := toProxy(proxy(1, 5), "http", stateActive, now.AddDate(0, 0, 5))
+	old.Name = old.ID
+	custom := toProxy(proxy(2, 5), "http", stateActive, now.AddDate(0, 0, 5))
+	custom.Name = "мой"
+	cfg := &fairway.Config{Proxies: []fairway.Proxy{old, custom}}
+	proxies, _, r := plan(cfg, []apiProxy{proxy(1, 5), proxy(2, 5)}, nil, defaults(), now)
+	if proxies[0].Name != "Германия-1" || proxies[1].Name != "мой" {
+		t.Fatalf("имена %q %q", proxies[0].Name, proxies[1].Name)
+	}
+	if !reflect.DeepEqual(r.Updated, []string{"spaceproxy-1"}) {
+		t.Fatalf("отчёт %+v", r)
+	}
+}
+
+func TestCountryName(t *testing.T) {
+	for code, want := range map[string]string{"us": "США", "GB": "Великобритания", "xx": "XX", "": ""} {
+		if got := countryName(code); got != want {
+			t.Errorf("countryName(%q) = %q, want %q", code, got, want)
+		}
 	}
 }
 
