@@ -1,0 +1,39 @@
+# Проверки на каждый push и pull request: форматирование, vet под wasip1,
+# сборка всех плагинов с проверкой манифестов.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "files are not gofmt-ed:"; echo "$out"; exit 1
+          fi
+
+      - name: go vet
+        run: GOOS=wasip1 GOARCH=wasm go vet ./...
+
+      - name: build
+        run: ./build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugins
+          path: dist/*.zip
