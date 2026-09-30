@@ -30,6 +30,10 @@ jobs:
       - name: go vet
         run: GOOS=wasip1 GOARCH=wasm go vet ./...
 
+      # Логика плагинов без вызовов хоста — обычные тесты на хост-платформе.
+      - name: go test
+        run: go test ./plugins/spaceproxy/...
+
       - name: build
         run: ./build.sh
 
