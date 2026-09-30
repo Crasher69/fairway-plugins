@@ -21,6 +21,9 @@ const (
 	pageSize = 2000
 	// renewPeriod — на сколько дней продлеваем.
 	renewPeriod = 30
+	// hideAfterDays — истёкшие дольше этого на странице не показываем:
+	// продлевать их уже никто не будет.
+	hideAfterDays = 7
 )
 
 var (
@@ -165,14 +168,16 @@ func snippet(b []byte) string {
 
 // row — прокси на странице плагина.
 type row struct {
-	ID       int64    `json:"id"`
-	Address  string   `json:"address"`
-	Country  string   `json:"country"`
-	IPv      int      `json:"ipv"`
-	DateEnd  string   `json:"date_end"`
-	DaysLeft float64  `json:"days_left"`
-	State    string   `json:"state"` // active, grace, gone
-	Lists    []string `json:"lists"`
+	ID      int64  `json:"id"`
+	Address string `json:"address"`
+	Country string `json:"country"`
+	// CountryRU — название страны по-русски, для русской панели.
+	CountryRU string   `json:"country_ru,omitempty"`
+	IPv       int      `json:"ipv"`
+	DateEnd   string   `json:"date_end"`
+	DaysLeft  float64  `json:"days_left"`
+	State     string   `json:"state"` // active, grace, gone
+	Lists     []string `json:"lists"`
 }
 
 func call(method string, params json.RawMessage) (any, error) {
@@ -250,7 +255,7 @@ func listView() (any, error) {
 	rows := make([]row, 0, len(last.Live))
 	for _, p := range last.Live {
 		st, end, err := classify(p, now, cfg.GraceDays)
-		r := row{ID: p.ID, Country: strings.ToUpper(p.Country), IPv: p.IPVersion,
+		r := row{ID: p.ID, Country: strings.ToUpper(p.Country), CountryRU: countryRU[strings.ToUpper(p.Country)], IPv: p.IPVersion,
 			Lists: member[fairwayID(p.ID)]}
 		port := p.PortHTTP
 		if cfg.Scheme == "socks5" {
@@ -258,6 +263,9 @@ func listView() (any, error) {
 		}
 		r.Address = fmt.Sprintf("%s:%d", p.IP, port)
 		if err == nil {
+			if now.Sub(end) > hideAfterDays*24*time.Hour {
+				continue
+			}
 			r.DateEnd = end.UTC().Format(time.RFC3339)
 			r.DaysLeft = end.Sub(now).Hours() / 24
 			r.State = [...]string{"active", "grace", "gone"}[st]

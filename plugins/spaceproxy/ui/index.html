@@ -12,9 +12,8 @@
   button { font: inherit; padding: 5px 12px; border-radius: 8px; border: 1px solid #8886; background: none; color: inherit; cursor: pointer; }
   button.primary { background: #2f6fde; border-color: #2f6fde; color: #fff; }
   button:disabled { opacity: .5; cursor: default; }
-  details { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
-  summary { padding: 8px 12px; cursor: pointer; display: flex; gap: 10px; align-items: center; }
-  summary b { min-width: 3em; }
+  section { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+  section .head { padding: 8px 12px; display: flex; gap: 10px; align-items: center; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th:first-child { width: 28px; }
   th, td { text-align: left; padding: 4px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
@@ -48,6 +47,15 @@
 
 <script>
   const ru = fairway.lang === 'ru';
+  // Названия стран: по-русски — из плагина (как в именах прокси), иначе —
+  // из браузера; неизвестный код остаётся кодом.
+  let regions = null;
+  try { regions = new Intl.DisplayNames([fairway.lang || 'en'], { type: 'region' }); } catch (e) { /* old browser */ }
+  const countryName = (p) => {
+    if (!p.country) return '—';
+    if (ru && p.country_ru) return p.country_ru;
+    try { return (regions && regions.of(p.country)) || p.country; } catch (e) { return p.country; }
+  };
   const T = {
     'Sync now': 'Синхронизировать', 'Select expiring': 'Выбрать истекающие', 'Clear': 'Снять выбор',
     'Renew': 'Продлить', 'Cancel': 'Отмена', 'Address': 'Адрес', 'Ends': 'Окончание', 'Left': 'Осталось',
@@ -94,19 +102,18 @@
     }
     const byCountry = new Map();
     for (const p of data.proxies) {
-      const key = p.country || '—';
+      const key = countryName(p);
       if (!byCountry.has(key)) byCountry.set(key, []);
       byCountry.get(key).push(p);
     }
-    for (const [country, list] of [...byCountry].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const box = document.createElement('details');
-      box.open = byCountry.size <= 3;
-      const summary = document.createElement('summary');
+    for (const [country, list] of [...byCountry].sort((a, b) => a[0].localeCompare(b[0], fairway.lang))) {
+      const box = document.createElement('section');
+      const summary = document.createElement('div');
+      summary.className = 'head';
       const all = document.createElement('input');
       all.type = 'checkbox';
       all.checked = list.every(p => picked.has(p.id));
-      all.onclick = e => {
-        e.stopPropagation();
+      all.onclick = () => {
         for (const p of list) all.checked ? picked.add(p.id) : picked.delete(p.id);
         render();
       };
