@@ -9,6 +9,7 @@
 |---|---|---|
 | [hello](plugins/hello) | base | Пишет в лог число прокси, показывает его на своей странице в панели |
 | [spaceproxy](plugins/spaceproxy) | base | Держит в конфиге прокси из аккаунта spaceproxy.net: добавляет активные, убирает истёкшие и удалённые, продлевает со своей страницы |
+| [proxy6](plugins/proxy6) | base | Держит в конфиге прокси из аккаунта proxy6.net: добавляет активные, убирает истёкшие и удалённые, продлевает со своей страницы |
 
 ## Установка
 
@@ -54,7 +55,7 @@ GOOS=wasip1 GOARCH=wasm go get github.com/Crasher69/fairway/plugin-sdk@main
 (файлы с вызовами SDK помечены `//go:build wasip1`):
 
 ```
-go test ./plugins/spaceproxy/
+go test ./internal/... ./plugins/spaceproxy/ ./plugins/proxy6/
 ```
 
 ## Новый плагин

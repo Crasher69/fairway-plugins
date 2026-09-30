@@ -215,14 +215,6 @@ func TestPlanRenamesOldDefault(t *testing.T) {
 	}
 }
 
-func TestCountryName(t *testing.T) {
-	for code, want := range map[string]string{"us": "США", "GB": "Великобритания", "xx": "XX", "": ""} {
-		if got := countryName(code); got != want {
-			t.Errorf("countryName(%q) = %q, want %q", code, got, want)
-		}
-	}
-}
-
 func TestParseSettings(t *testing.T) {
 	s, every, err := parseSettings(json.RawMessage(`{"api_key":" k "}`))
 	if err != nil || s.APIKey != "k" || every != 10*time.Minute || s.GraceDays != 3 || s.List != "spaceproxy" {

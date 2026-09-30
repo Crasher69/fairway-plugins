@@ -32,7 +32,7 @@ jobs:
 
       # Логика плагинов без вызовов хоста — обычные тесты на хост-платформе.
       - name: go test
-        run: go test ./plugins/spaceproxy/...
+        run: go test ./internal/... ./plugins/spaceproxy/... ./plugins/proxy6/...
 
       - name: build
         run: ./build.sh

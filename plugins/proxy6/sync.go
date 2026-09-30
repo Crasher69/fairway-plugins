@@ -13,12 +13,12 @@ import (
 	"github.com/Crasher69/fairway-plugins/internal/countries"
 )
 
-// idPrefix — id прокси в fairway = idPrefix + id в spaceproxy. По нему
-// плагин узнаёт свои прокси: имя и комментарий можно менять в панели, id —
-// нет, и на него ссылаются листы. Чужие прокси плагин не трогает.
-const idPrefix = "spaceproxy-"
+// idPrefix — id прокси в fairway = idPrefix + id в proxy6. По нему плагин
+// узнаёт свои прокси: имя и комментарий можно менять в панели, id — нет,
+// и на него ссылаются листы. Чужие прокси плагин не трогает.
+const idPrefix = "proxy6-"
 
-func fairwayID(id int64) string { return idPrefix + strconv.FormatInt(id, 10) }
+func fairwayID(id num) string { return idPrefix + strconv.FormatInt(int64(id), 10) }
 
 // state — во что превращается прокси сервиса по правилам синхронизации.
 type state int
@@ -33,9 +33,9 @@ const (
 )
 
 func classify(p apiProxy, now time.Time, graceDays int) (state, time.Time, error) {
-	end, err := parseTime(p.DateEnd)
+	end, err := p.end()
 	if err != nil {
-		return stateGone, end, fmt.Errorf("proxy %d: date_end: %w", p.ID, err)
+		return stateGone, end, err
 	}
 	switch {
 	case end.After(now):
@@ -66,21 +66,21 @@ func (r report) String() string {
 	return s
 }
 
-// plan приводит прокси и листы fairway к списку сервиса. live — всё, что не
-// удалено (status=exclude_deleted), deleted — удалённые (status=deleted).
+// plan приводит прокси и листы fairway к списку сервиса. all — все прокси
+// аккаунта (getproxy state=all): свой прокси, которого там нет, удалён.
 // Возвращает новые разделы proxies и lists; прокси без префикса idPrefix
 // остаются как были.
-func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Time) ([]fairway.Proxy, []fairway.List, report) {
+func plan(cfg *fairway.Config, all []apiProxy, s settings, now time.Time) ([]fairway.Proxy, []fairway.List, report) {
 	var r report
 
 	type target struct {
 		proxy fairway.Proxy
 		state state
 	}
-	want := make(map[string]target, len(live))
+	want := make(map[string]target, len(all))
 	// unparsed — прокси, чью дату окончания не разобрать: их не трогаем.
 	unparsed := make(map[string]bool)
-	for _, p := range live {
+	for _, p := range all {
 		st, end, err := classify(p, now, s.GraceDays)
 		if err != nil {
 			r.Warnings = append(r.Warnings, err.Error())
@@ -90,21 +90,15 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 		want[fairwayID(p.ID)] = target{proxy: toProxy(p, s.Scheme, st, end), state: st}
 	}
 	gone := make(map[string]bool)
-	for _, p := range deleted {
-		id := fairwayID(p.ID)
-		if _, ok := want[id]; !ok {
-			gone[id] = true
-		}
-	}
 	for id, t := range want {
 		if t.state == stateGone {
 			gone[id] = true
 		}
 	}
-	// Своего прокси нет ни среди живых, ни среди удалённых — сервис его
-	// больше не знает. Но пустой ответ скорее значит чужой ключ или сбой,
-	// чем пустой аккаунт: тогда ничего не удаляем.
-	if len(live) > 0 || len(deleted) > 0 {
+	// Своего прокси нет в ответе — сервис его больше не знает. Но пустой
+	// ответ скорее значит чужой ключ или сбой, чем пустой аккаунт: тогда
+	// ничего не удаляем.
+	if len(all) > 0 {
 		for _, p := range cfg.Proxies {
 			if _, ok := want[p.ID]; !ok && !unparsed[p.ID] && strings.HasPrefix(p.ID, idPrefix) {
 				gone[p.ID] = true
@@ -158,11 +152,6 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 		}
 		updated := t.proxy
 		updated.Name = p.Name // имя — дело человека
-		if p.Name == p.ID {
-			// Старое имя по умолчанию (spaceproxy-<id>) меняем на новое.
-			updated.Name = uniqueName(defaultName(t.proxy), names)
-			names[updated.Name] = true
-		}
 		if updated != p {
 			r.Updated = append(r.Updated, p.ID)
 		}
@@ -196,28 +185,36 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 	return proxies, lists, r
 }
 
-func toProxy(p apiProxy, scheme string, st state, end time.Time) fairway.Proxy {
-	port := p.PortHTTP
-	if scheme == "socks5" {
-		port = p.PortSocks5
+// scheme — протокол прокси в fairway: http и socks заданы в proxy6, auto
+// (оба на одном порту) — из настроек.
+func scheme(p apiProxy, auto string) string {
+	switch p.Type {
+	case "http":
+		return "http"
+	case "socks":
+		return "socks5"
 	}
-	comment := "spaceproxy · до " + end.Format("2006-01-02")
+	return auto
+}
+
+func toProxy(p apiProxy, auto string, st state, end time.Time) fairway.Proxy {
+	comment := "proxy6 · до " + end.Format("2006-01-02")
 	if st != stateActive {
-		comment = "spaceproxy · истёк " + end.Format("2006-01-02")
+		comment = "proxy6 · истёк " + end.Format("2006-01-02")
 	}
 	return fairway.Proxy{
 		ID:       fairwayID(p.ID),
-		Scheme:   scheme,
-		Host:     p.IP,
-		Port:     port,
-		Login:    p.Username,
-		Password: p.Password,
+		Scheme:   scheme(p, auto),
+		Host:     p.address(),
+		Port:     int(p.Port),
+		Login:    p.User,
+		Password: p.Pass,
 		Country:  strings.ToUpper(p.Country),
 		Comment:  comment,
 	}
 }
 
-// defaultName — имя нового прокси: страна и id в сервисе, «США-369160».
+// defaultName — имя нового прокси: страна и id в сервисе, «Россия-11».
 // Без страны — id в fairway.
 func defaultName(p fairway.Proxy) string {
 	country := countries.Name(p.Country)

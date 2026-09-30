@@ -13,6 +13,8 @@ import (
 	"time"
 
 	fairway "github.com/Crasher69/fairway/plugin-sdk"
+
+	"github.com/Crasher69/fairway-plugins/internal/countries"
 )
 
 const (
@@ -255,7 +257,7 @@ func listView() (any, error) {
 	rows := make([]row, 0, len(last.Live))
 	for _, p := range last.Live {
 		st, end, err := classify(p, now, cfg.GraceDays)
-		r := row{ID: p.ID, Country: strings.ToUpper(p.Country), CountryRU: countryRU[strings.ToUpper(p.Country)], IPv: p.IPVersion,
+		r := row{ID: p.ID, Country: strings.ToUpper(p.Country), CountryRU: countries.RU[strings.ToUpper(p.Country)], IPv: p.IPVersion,
 			Lists: member[fairwayID(p.ID)]}
 		port := p.PortHTTP
 		if cfg.Scheme == "socks5" {
