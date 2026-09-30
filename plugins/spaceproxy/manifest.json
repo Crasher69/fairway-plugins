@@ -1,0 +1,66 @@
+{
+  "name": "spaceproxy",
+  "version": "0.1.0",
+  "title": "Spaceproxy",
+  "description": "Keeps proxies from your spaceproxy.net account in the config: adds active ones, removes expired and deleted ones, renews from its page.",
+  "kind": "base",
+  "permissions": [
+    "config.read",
+    "config.write",
+    "schedule",
+    "http.fetch"
+  ],
+  "http_hosts": [
+    "panel.spaceproxy.net"
+  ],
+  "settings_schema": {
+    "type": "object",
+    "required": ["api_key"],
+    "properties": {
+      "api_key": {
+        "type": "string",
+        "title": "API key",
+        "description": "Key from panel.spaceproxy.net.",
+        "format": "password"
+      },
+      "list": {
+        "type": "string",
+        "title": "List",
+        "description": "List for new proxies; created if missing. Empty: add to the proxy catalog only.",
+        "default": "spaceproxy"
+      },
+      "scheme": {
+        "type": "string",
+        "title": "Protocol",
+        "description": "Which port of the proxy to use.",
+        "enum": ["http", "socks5"],
+        "default": "http"
+      },
+      "interval": {
+        "type": "string",
+        "title": "Sync interval",
+        "description": "How often to sync: 5m, 10m, 1h. At least 1m.",
+        "default": "10m"
+      },
+      "grace_days": {
+        "type": "integer",
+        "title": "Days to keep expired",
+        "description": "An expired proxy stays untouched this many days, then it is removed from lists and the catalog.",
+        "default": 3,
+        "minimum": 0
+      },
+      "via_fairway": {
+        "type": "boolean",
+        "title": "Go to the API through fairway",
+        "description": "Requests to panel.spaceproxy.net go through fairway's own proxy and use the list of its domain rule.",
+        "default": false
+      },
+      "direct_fallback": {
+        "type": "boolean",
+        "title": "Fall back to direct",
+        "description": "If the request through fairway fails with a network error, retry directly.",
+        "default": false
+      }
+    }
+  }
+}
