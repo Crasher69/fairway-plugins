@@ -73,3 +73,7 @@ zip и `SHA256SUMS`.
 ```
 git tag hello-v0.1.0 && git push origin hello-v0.1.0
 ```
+
+## Лицензия
+
+[Apache License 2.0](LICENSE). Copyright 2026 Rinat Devetyarov.
