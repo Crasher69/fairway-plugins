@@ -15,10 +15,10 @@ var now = time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 // Ответ /ip по спецификации proxys.io API v2: список заказов, у каждого
 // свои логин, пароль, дата окончания и IP с портами.
 const sampleIP = `{"success":true,"data":[
-{"order_id":10258,"ip_version":"IPv4","username":"user1","password":"pass1","ip_access":"","expires_at":1493116222,
+{"order_id":10258,"ip_version":"4","username":"user1","password":"pass1","ip_access":"","expires_at":1493116222,
  "list_ip":[{"ip":"185.22.134.9","port_socks":"1081","port_http":"8081","port_https":"8443"},
             {"ip":"185.22.134.2","port_socks":"1080","port_http":"8080","port_https":"8443"}]},
-{"order_id":"10300","ip_version":"IPv6","username":"user2","password":"pass2","expires_at":"2017-05-01 10:00:00","country":"de",
+{"order_id":"10300","ip_version":"6","username":"user2","password":"pass2","expires_at":"2017-05-01 10:00:00","country":"de",
  "list_ip":[{"ip":"2a00:1838::1","port_socks":1090,"port_http":"","port_https":""}]}]}`
 
 func TestParseIP(t *testing.T) {
@@ -90,7 +90,7 @@ func TestEnvelopeError(t *testing.T) {
 func proxy(id int64, days float64) apiProxy {
 	end := now.Add(time.Duration(days * 24 * float64(time.Hour)))
 	return apiProxy{OrderID: id, N: 1, IP: "10.0.0.1", PortHTTP: 8000, PortSocks: 1080, User: "u", Pass: "p",
-		Country: "DE", IPVersion: "IPv4", End: end}
+		Country: "DE", IPVersion: "4", End: end}
 }
 
 func defaults() settings { return settings{List: "proxys", Scheme: "http", GraceDays: 3} }
@@ -302,8 +302,8 @@ func TestParseSettings(t *testing.T) {
 }
 
 func TestRedact(t *testing.T) {
-	got := redact(`Get "https://proxys.io/ru/api/v2/ip?key=sec+ret": timeout; sec ret`, "sec ret")
-	if got != `Get "https://proxys.io/ru/api/v2/ip?key=***": timeout; ***` {
+	got := redact(`Get "https://proxys.world/api/v2/ip?key=sec+ret": timeout; sec ret`, "sec ret")
+	if got != `Get "https://proxys.world/api/v2/ip?key=***": timeout; ***` {
 		t.Fatalf("%q", got)
 	}
 }

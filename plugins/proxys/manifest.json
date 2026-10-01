@@ -17,7 +17,7 @@
     "http.fetch"
   ],
   "http_hosts": [
-    "proxys.io"
+    "proxys.world"
   ],
   "settings_schema": {
     "type": "object",
@@ -93,12 +93,12 @@
       "via_fairway": {
         "type": "boolean",
         "title": "Go to the API through fairway",
-        "description": "Requests to proxys.io go through fairway's own proxy and use the list of its domain rule.",
+        "description": "Requests to proxys.world (the proxys.io API) go through fairway's own proxy and use the list of its domain rule.",
         "default": false,
         "i18n": {
           "ru": {
             "title": "Ходить к API через fairway",
-            "description": "Запросы к proxys.io идут через прокси самого fairway, по листу его правила для домена."
+            "description": "Запросы к proxys.world (API proxys.io) идут через прокси самого fairway, по листу его правила для домена."
           }
         }
       },

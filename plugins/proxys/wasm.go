@@ -18,7 +18,7 @@ import (
 
 const (
 	// apiBase — к нему дописывается метод: .../api/v2/ip?key=...
-	apiBase = "https://proxys.io/ru/api/v2/"
+	apiBase = "https://proxys.world/api/v2/"
 	// renewPeriod — на сколько дней продлевает /extending; другого срока
 	// API не предлагает.
 	renewPeriod = 30
@@ -179,6 +179,7 @@ func fetch(httpMethod, method string, body map[string]any) (json.RawMessage, err
 		// Ошибка API приходит и с кодом 4xx: её текст полезнее кода.
 		return nil, err
 	}
+	// /ip по ключу пользователя отвечает 201 — тоже успех.
 	if resp.Status/100 != 2 {
 		return nil, fmt.Errorf("proxys %s: HTTP %d: %s", method, resp.Status, snippet(resp.Body))
 	}
@@ -247,7 +248,9 @@ func renew(orders []int64) (any, error) {
 	var done []int64
 	var failed error
 	for _, id := range orders {
-		data, err := request("POST", "extending", map[string]any{"order_id": id})
+		// В схеме Extending обязательное поле названо order, а описано
+		// order_id: шлём оба.
+		data, err := request("POST", "extending", map[string]any{"order_id": id, "order": id})
 		if err != nil {
 			failed = err
 			break
@@ -300,7 +303,7 @@ func listView() (any, error) {
 		st, end, err := classify(p, now, cfg.GraceDays)
 		sc := p.scheme(cfg.Scheme)
 		r := row{ID: serviceID(p), OrderID: p.OrderID, Country: p.Country, CountryRU: countries.RU[p.Country],
-			Kind: p.IPVersion, Scheme: sc, Address: fmt.Sprintf("%s:%d", p.IP, p.port(sc)), Lists: member[fairwayID(p)]}
+			Kind: ipVersionName(p.IPVersion), Scheme: sc, Address: fmt.Sprintf("%s:%d", p.IP, p.port(sc)), Lists: member[fairwayID(p)]}
 		if err == nil {
 			if now.Sub(end) > hideAfterDays*24*time.Hour {
 				continue

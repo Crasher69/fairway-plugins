@@ -147,7 +147,8 @@ type apiOrder struct {
 	IPAccess  string  `json:"ip_access"`
 	ExpiresAt stamp   `json:"expires_at"`
 	ListIP    []apiIP `json:"list_ip"`
-	// Страны в документации у заказа нет; если API её отдаёт, берём.
+	// Страны в документации у заказа нет (и /services её с заказом не
+	// связывает); если API всё же её отдаёт, берём.
 	Country     string `json:"country"`
 	CountryCode string `json:"country_code"`
 }
@@ -312,6 +313,17 @@ type extendReply struct {
 	Price     money  `json:"price"`
 	Currency  string `json:"currency"`
 	ExpiresAt stamp  `json:"expires_at"`
+}
+
+// ipVersionName — тип прокси для страницы: API отдаёт "4" или "6".
+func ipVersionName(v string) string {
+	switch strings.TrimSpace(v) {
+	case "4":
+		return "IPv4"
+	case "6":
+		return "IPv6"
+	}
+	return v
 }
 
 // redact убирает ключ из текста: он идёт в адрес запроса и попадает в
