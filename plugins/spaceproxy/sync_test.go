@@ -236,3 +236,50 @@ func TestParseBalance(t *testing.T) {
 		t.Fatalf("%+v", b)
 	}
 }
+
+func TestPlanAdoptsManualProxy(t *testing.T) {
+	// Руками добавлен прокси 1 (по socks-порту) и прокси 2, который плагин
+	// уже успел добавить сам — дубль.
+	p1, p2, p3 := proxy(1, 5), proxy(2, 5), proxy(3, -10)
+	p1.IP, p2.IP, p3.IP = "10.0.0.1", "10.0.0.2", "10.0.0.3"
+	own2 := toProxy(p2, "http", stateActive, now.AddDate(0, 0, 5))
+	own2.Name = "Германия-2"
+	cfg := &fairway.Config{
+		Proxies: []fairway.Proxy{
+			{ID: "m1", Name: "руками", Scheme: "socks5", Host: "10.0.0.1", Port: 9000, Comment: "мой"},
+			{ID: "m2", Name: "дубль", Host: "10.0.0.2", Port: 8000},
+			{ID: "m3", Name: "давно истёк", Host: "10.0.0.3", Port: 8000},
+			own2,
+		},
+		Lists: []fairway.List{
+			{Name: "main", Proxies: []string{"m1", "m2", "m3"}},
+			{Name: "spaceproxy", Proxies: []string{"spaceproxy-2"}},
+		},
+	}
+	proxies, lists, r := plan(cfg, []apiProxy{p1, p2, p3}, nil, defaults(), now)
+
+	if got := ids(proxies); !reflect.DeepEqual(got, []string{"spaceproxy-1", "m3", "spaceproxy-2"}) {
+		t.Fatalf("прокси %v", got)
+	}
+	a := proxies[0]
+	if a.Name != "Германия-1" || a.Comment != "spaceproxy · до 2026-10-05" || a.Scheme != "http" || a.Port != 8000 {
+		t.Fatalf("забранный %+v", a)
+	}
+	if got := listOf(lists, "main"); !reflect.DeepEqual(got, []string{"spaceproxy-1", "spaceproxy-2", "m3"}) {
+		t.Fatalf("main %v", got)
+	}
+	if got := listOf(lists, "spaceproxy"); !reflect.DeepEqual(got, []string{"spaceproxy-2"}) {
+		t.Fatalf("spaceproxy %v", got)
+	}
+	if !reflect.DeepEqual(r.Adopted, []string{"m1 → spaceproxy-1"}) || !reflect.DeepEqual(r.Merged, []string{"m2 → spaceproxy-2"}) ||
+		len(r.Added) > 0 || len(r.Updated) > 0 || !r.changed() {
+		t.Fatalf("отчёт %+v", r)
+	}
+
+	// Второй проход ничего не меняет.
+	cfg = &fairway.Config{Proxies: proxies, Lists: lists}
+	_, _, r = plan(cfg, []apiProxy{p1, p2, p3}, nil, defaults(), now)
+	if r.changed() {
+		t.Fatalf("повтор %+v", r)
+	}
+}

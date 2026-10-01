@@ -102,7 +102,7 @@ func doSync() (report, error) {
 	for _, w := range r.Warnings {
 		fairway.Warnf("%s", w)
 	}
-	if len(r.Added)+len(r.Updated)+len(r.Removed) > 0 {
+	if r.changed() {
 		if _, err := fairway.EditConfig(fairway.ConfigEdit{Proxies: &proxies, Lists: &lists}); err != nil {
 			return r, fmt.Errorf("config: %w", err)
 		}

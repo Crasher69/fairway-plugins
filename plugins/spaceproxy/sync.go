@@ -10,6 +10,7 @@ import (
 
 	fairway "github.com/Crasher69/fairway/plugin-sdk"
 
+	"github.com/Crasher69/fairway-plugins/internal/adopt"
 	"github.com/Crasher69/fairway-plugins/internal/countries"
 )
 
@@ -52,14 +53,31 @@ type report struct {
 	Added   []string `json:"added"`
 	Updated []string `json:"updated"`
 	Removed []string `json:"removed"`
+	// Adopted — прокси, которые уже были в fairway с тем же адресом и
+	// стали прокси плагина («старый id → новый»).
+	Adopted []string `json:"adopted"`
+	// Merged — дубли прокси плагина с тем же адресом, убранные из каталога
+	// («старый id → id плагина»); листы теперь ссылаются на прокси плагина.
+	Merged []string `json:"merged"`
 	// Kept — прокси, которые надо было убрать, но они последние в листе:
 	// пустой лист fairway не примет.
 	Kept     []string `json:"kept"`
 	Warnings []string `json:"warnings"`
 }
 
+// changed — синхронизации есть что записать в конфиг.
+func (r report) changed() bool {
+	return len(r.Added)+len(r.Updated)+len(r.Removed)+len(r.Adopted)+len(r.Merged) > 0
+}
+
 func (r report) String() string {
 	s := fmt.Sprintf("added %d, updated %d, removed %d", len(r.Added), len(r.Updated), len(r.Removed))
+	if len(r.Adopted) > 0 {
+		s += fmt.Sprintf(", adopted %d", len(r.Adopted))
+	}
+	if len(r.Merged) > 0 {
+		s += fmt.Sprintf(", merged %d duplicates", len(r.Merged))
+	}
 	if len(r.Kept) > 0 {
 		s += fmt.Sprintf(", kept %d (last in a list)", len(r.Kept))
 	}
@@ -89,6 +107,39 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 		}
 		want[fairwayID(p.ID)] = target{proxy: toProxy(p, s.Scheme, st, end), state: st}
 	}
+	// Прокси сервиса, которые уже есть в fairway под другим id (добавлены
+	// руками), становятся своими: id плагина, ссылки в листах — на него.
+	// Иначе тот же прокси появился бы второй раз.
+	byAddress := make(map[string]string)
+	ambiguous := make(map[string]bool)
+	for _, p := range live {
+		id := fairwayID(p.ID)
+		if t, ok := want[id]; !ok || t.state == stateGone {
+			continue
+		}
+		for _, key := range addressKeys(p) {
+			if other, ok := byAddress[key]; ok && other != id {
+				ambiguous[key] = true
+			}
+			byAddress[key] = id
+		}
+	}
+	for key := range ambiguous {
+		delete(byAddress, key)
+	}
+	catalog, catalogLists, ad := adopt.Apply(cfg.Proxies, cfg.Lists, byAddress)
+	cfg = &fairway.Config{Proxies: catalog, Lists: catalogLists}
+	adopted := make(map[string]bool, len(ad.Adopted))
+	for from, to := range ad.Adopted {
+		adopted[to] = true
+		r.Adopted = append(r.Adopted, from+" → "+to)
+	}
+	for from, to := range ad.Merged {
+		r.Merged = append(r.Merged, from+" → "+to)
+	}
+	sort.Strings(r.Adopted)
+	sort.Strings(r.Merged)
+
 	gone := make(map[string]bool)
 	for _, p := range deleted {
 		id := fairwayID(p.ID)
@@ -158,12 +209,14 @@ func plan(cfg *fairway.Config, live, deleted []apiProxy, s settings, now time.Ti
 		}
 		updated := t.proxy
 		updated.Name = p.Name // имя — дело человека
-		if p.Name == p.ID {
-			// Старое имя по умолчанию (spaceproxy-<id>) меняем на новое.
+		if p.Name == p.ID || adopted[p.ID] {
+			// Старое имя по умолчанию (spaceproxy-<id>) и имя забранного
+			// прокси меняем на имя плагина.
+			delete(names, p.Name)
 			updated.Name = uniqueName(defaultName(t.proxy), names)
 			names[updated.Name] = true
 		}
-		if updated != p {
+		if updated != p && !adopted[p.ID] {
 			r.Updated = append(r.Updated, p.ID)
 		}
 		proxies = append(proxies, updated)
@@ -240,4 +293,10 @@ func idLess(a, b string) bool {
 	x, _ := strconv.ParseInt(strings.TrimPrefix(a, idPrefix), 10, 64)
 	y, _ := strconv.ParseInt(strings.TrimPrefix(b, idPrefix), 10, 64)
 	return x < y
+}
+
+// addressKeys — адреса прокси сервиса, по которым его можно узнать в
+// fairway (adopt.Key).
+func addressKeys(p apiProxy) []string {
+	return []string{adopt.Key(p.IP, p.PortHTTP), adopt.Key(p.IP, p.PortSocks5)}
 }

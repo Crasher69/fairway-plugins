@@ -251,3 +251,43 @@ func TestRedact(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+func TestPlanAdoptsManualProxy(t *testing.T) {
+	// Руками добавлен прокси 1 и прокси 2, который плагин уже успел
+	// добавить сам — дубль.
+	p1, p2 := proxy(1, 5), proxy(2, 5)
+	p1.Host, p2.Host = "10.0.0.1", "10.0.0.2"
+	own2 := toProxy(p2, "http", stateActive, now.AddDate(0, 0, 5))
+	own2.Name = "Германия-2"
+	cfg := &fairway.Config{
+		Proxies: []fairway.Proxy{
+			{ID: "m1", Name: "руками", Host: "10.0.0.1", Port: 8000, Comment: "мой"},
+			{ID: "m2", Name: "дубль", Host: "10.0.0.2", Port: 8000},
+			own2,
+		},
+		Lists: []fairway.List{
+			{Name: "main", Proxies: []string{"m1", "m2"}},
+			{Name: "proxy6", Proxies: []string{"proxy6-2"}},
+		},
+	}
+	proxies, lists, r := plan(cfg, []apiProxy{p1, p2}, defaults(), now)
+
+	if got := ids(proxies); !reflect.DeepEqual(got, []string{"proxy6-1", "proxy6-2"}) {
+		t.Fatalf("прокси %v", got)
+	}
+	if a := proxies[0]; a.Name != "Германия-1" || a.Comment != "proxy6 · до 2026-10-05" {
+		t.Fatalf("забранный %+v", a)
+	}
+	if got := listOf(lists, "main"); !reflect.DeepEqual(got, []string{"proxy6-1", "proxy6-2"}) {
+		t.Fatalf("main %v", got)
+	}
+	if !reflect.DeepEqual(r.Adopted, []string{"m1 → proxy6-1"}) || !reflect.DeepEqual(r.Merged, []string{"m2 → proxy6-2"}) ||
+		len(r.Added) > 0 || len(r.Updated) > 0 {
+		t.Fatalf("отчёт %+v", r)
+	}
+
+	cfg = &fairway.Config{Proxies: proxies, Lists: lists}
+	if _, _, r = plan(cfg, []apiProxy{p1, p2}, defaults(), now); r.changed() {
+		t.Fatalf("повтор %+v", r)
+	}
+}
