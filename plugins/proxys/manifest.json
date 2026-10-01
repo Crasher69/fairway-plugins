@@ -1,0 +1,119 @@
+{
+  "name": "proxys",
+  "version": "0.1.0",
+  "title": "Proxys",
+  "description": "Keeps proxies from your proxys.io account in the config: adds active ones, removes expired and deleted ones, renews orders from its page.",
+  "i18n": {
+    "ru": {
+      "title": "Proxys",
+      "description": "Держит прокси из аккаунта proxys.io в конфиге: добавляет активные, убирает истёкшие и удалённые, продлевает заказы со своей страницы."
+    }
+  },
+  "kind": "base",
+  "permissions": [
+    "config.read",
+    "config.write",
+    "schedule",
+    "http.fetch"
+  ],
+  "http_hosts": [
+    "proxys.world"
+  ],
+  "settings_schema": {
+    "type": "object",
+    "required": [
+      "api_key"
+    ],
+    "properties": {
+      "api_key": {
+        "type": "string",
+        "title": "API key",
+        "description": "Key from proxys.io, the \"API\" section of the account.",
+        "format": "password",
+        "i18n": {
+          "ru": {
+            "title": "Ключ API",
+            "description": "Ключ из proxys.io, раздел «API» в личном кабинете."
+          }
+        }
+      },
+      "list": {
+        "type": "string",
+        "title": "List",
+        "description": "List for new proxies; created if missing. Empty: add to the proxy catalog only.",
+        "default": "proxys",
+        "i18n": {
+          "ru": {
+            "title": "Лист",
+            "description": "Лист для новых прокси; если его нет, создаётся. Пусто: только в каталог прокси."
+          }
+        }
+      },
+      "scheme": {
+        "type": "string",
+        "title": "Protocol",
+        "description": "Each IP has separate HTTP and SOCKS5 ports; this picks which one fairway connects to.",
+        "enum": [
+          "http",
+          "socks5"
+        ],
+        "default": "http",
+        "i18n": {
+          "ru": {
+            "title": "Протокол",
+            "description": "У каждого IP свои порты для HTTP и SOCKS5; выбирает, к какому подключается fairway."
+          }
+        }
+      },
+      "interval": {
+        "type": "string",
+        "title": "Sync interval",
+        "description": "How often to sync: 5m, 10m, 1h. At least 1m.",
+        "default": "10m",
+        "i18n": {
+          "ru": {
+            "title": "Интервал синхронизации",
+            "description": "Как часто синхронизировать: 5m, 10m, 1h. Не меньше 1m."
+          }
+        }
+      },
+      "grace_days": {
+        "type": "integer",
+        "title": "Days to keep expired",
+        "description": "An expired proxy stays untouched this many days, then it is removed from lists and the catalog.",
+        "default": 3,
+        "minimum": 0,
+        "i18n": {
+          "ru": {
+            "title": "Сколько дней держать истёкшие",
+            "description": "Истёкший прокси не трогаем столько дней, потом он убирается из листов и каталога."
+          }
+        }
+      },
+      "via_fairway": {
+        "type": "boolean",
+        "title": "Go to the API through fairway",
+        "description": "Requests to proxys.world (the proxys.io API) go through fairway's own proxy and use the list of its domain rule.",
+        "default": false,
+        "i18n": {
+          "ru": {
+            "title": "Ходить к API через fairway",
+            "description": "Запросы к proxys.world (API proxys.io) идут через прокси самого fairway, по листу его правила для домена."
+          }
+        }
+      },
+      "direct_fallback": {
+        "type": "boolean",
+        "title": "Fall back to direct",
+        "description": "If the request through fairway fails with a network error, retry directly.",
+        "default": false,
+        "i18n": {
+          "ru": {
+            "title": "Если не вышло, напрямую",
+            "description": "Если запрос через fairway не прошёл из-за сети, повторить напрямую."
+          }
+        }
+      }
+    }
+  }
+}
