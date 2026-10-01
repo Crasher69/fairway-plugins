@@ -1,6 +1,6 @@
 {
   "name": "proxy6",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Proxy6",
   "description": "Keeps proxies from your proxy6.net account in the config: adds active ones, removes expired and deleted ones, renews from its page.",
   "i18n": {

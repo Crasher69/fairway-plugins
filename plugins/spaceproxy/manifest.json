@@ -1,6 +1,6 @@
 {
   "name": "spaceproxy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "title": "Spaceproxy",
   "description": "Keeps proxies from your spaceproxy.net account in the config: adds active ones, removes expired and deleted ones, renews from its page.",
   "i18n": {
