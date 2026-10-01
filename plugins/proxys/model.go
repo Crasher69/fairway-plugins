@@ -131,22 +131,26 @@ func (t *stamp) UnmarshalJSON(b []byte) error {
 
 // apiIP — один IP заказа.
 type apiIP struct {
-	IP        string `json:"ip"`
-	PortSocks num    `json:"port_socks"`
-	PortHTTP  num    `json:"port_http"`
-	PortHTTPS num    `json:"port_https"`
+	IP string `json:"ip"`
+	// Порт SOCKS5 живой API отдаёт в port_socks5, документация — в
+	// port_socks; берём любой.
+	PortSocks  num `json:"port_socks"`
+	PortSocks5 num `json:"port_socks5"`
+	PortHTTP   num `json:"port_http"`
+	PortHTTPS  num `json:"port_https"`
 }
 
 // apiOrder — заказ в ответе /ip: один логин и пароль, одна дата окончания
 // и список IP.
 type apiOrder struct {
-	OrderID   num     `json:"order_id"`
-	IPVersion string  `json:"ip_version"`
-	Username  string  `json:"username"`
-	Password  string  `json:"password"`
-	IPAccess  string  `json:"ip_access"`
-	ExpiresAt stamp   `json:"expires_at"`
-	ListIP    []apiIP `json:"list_ip"`
+	OrderID   num    `json:"order_id"`
+	IPVersion string `json:"ip_version"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	// IPAccess — строка с IP, а если не задан — false; плагину не нужен.
+	IPAccess  json.RawMessage `json:"ip_access"`
+	ExpiresAt stamp           `json:"expires_at"`
+	ListIP    []apiIP         `json:"list_ip"`
 	// Страны в документации у заказа нет (и /services её с заказом не
 	// связывает); если API всё же её отдаёт, берём.
 	Country     string `json:"country"`
@@ -192,9 +196,13 @@ func flatten(orders []apiOrder) []apiProxy {
 			country = ""
 		}
 		for i, ip := range ips {
+			socks := ip.PortSocks5
+			if socks == 0 {
+				socks = ip.PortSocks
+			}
 			out = append(out, apiProxy{
 				OrderID: int64(o.OrderID), N: i + 1, IP: strings.TrimSpace(ip.IP),
-				PortHTTP: int(ip.PortHTTP), PortSocks: int(ip.PortSocks),
+				PortHTTP: int(ip.PortHTTP), PortSocks: int(socks),
 				User: o.Username, Pass: o.Password, Country: strings.ToUpper(country),
 				IPVersion: o.IPVersion, End: time.Time(o.ExpiresAt),
 			})

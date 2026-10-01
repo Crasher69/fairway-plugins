@@ -53,6 +53,36 @@ func TestParseIP(t *testing.T) {
 	}
 }
 
+// Живой ответ /ip с ключом заказа (пароль заменён): один заказ, порт
+// SOCKS5 в port_socks5, ip_access — false, страна в country_code.
+const liveOrder = `{"success":true,"data":{"order_id":1645518,"count":1,"country_code":"EE","ip_version":"4","username":"user425278","password":"***","ip_access":false,"expires_at":1791710334,"list_ip":[{"ip":"86.110.40.17","port_socks5":18191,"port_http":8191,"port_https":8191}]}}`
+
+func TestParseLiveOrder(t *testing.T) {
+	data, err := checkEnvelope("ip", []byte(liveOrder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	orders, err := parseOrders(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := flatten(orders)
+	want := apiProxy{OrderID: 1645518, N: 1, IP: "86.110.40.17", PortHTTP: 8191, PortSocks: 18191, User: "user425278",
+		Pass: "***", Country: "EE", IPVersion: "4", End: time.Unix(1791710334, 0).UTC()}
+	if len(all) != 1 || all[0] != want {
+		t.Fatalf("прокси %+v", all)
+	}
+	proxies, _, _ := plan(&fairway.Config{}, all, defaults(), now)
+	if p := proxies[0]; p.ID != "proxys-1645518-1" || p.Name != "Эстония-1645518-1" || p.Port != 8191 || p.Country != "EE" {
+		t.Fatalf("в fairway %+v", p)
+	}
+	s := defaults()
+	s.Scheme = "socks5"
+	if proxies, _, _ = plan(&fairway.Config{}, all, s, now); proxies[0].Port != 18191 {
+		t.Fatalf("socks5 %+v", proxies[0])
+	}
+}
+
 func TestParseOrdersShapes(t *testing.T) {
 	for _, raw := range []string{`[]`, `null`, ``, `{}`} {
 		list, err := parseOrders(json.RawMessage(raw))
@@ -344,5 +374,17 @@ func TestPlanAdoptsManualProxy(t *testing.T) {
 	cfg = &fairway.Config{Proxies: proxies, Lists: lists}
 	if _, _, r = plan(cfg, []apiProxy{p1, p2}, defaults(), now); r.changed() {
 		t.Fatalf("повтор %+v", r)
+	}
+}
+
+// Живой ответ /balance: сумма дробная, есть лишнее поле buyCourse.
+func TestParseBalance(t *testing.T) {
+	data, err := checkEnvelope("balance", []byte(`{"success":true,"data":{"user_balance":1.71,"currency":"USD","buyCourse":83.18}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b balanceReply
+	if err := json.Unmarshal(data, &b); err != nil || b.UserBalance != 1.71 || b.Currency != "USD" {
+		t.Fatalf("%+v %v", b, err)
 	}
 }
