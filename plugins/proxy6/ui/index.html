@@ -12,7 +12,7 @@
   button { font: inherit; padding: 5px 12px; border-radius: 8px; border: 1px solid #8886; background: none; color: inherit; cursor: pointer; }
   button.primary { background: #2f6fde; border-color: #2f6fde; color: #fff; }
   button:disabled { opacity: .5; cursor: default; }
-  section { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+  section { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 20px; }
   section .head { padding: 8px 12px; display: flex; gap: 10px; align-items: center; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th:first-child { width: 28px; }
@@ -77,12 +77,16 @@
     if (d > 0) return ru ? `${Math.max(1, Math.round(d * 24))} ч` : `${Math.max(1, Math.round(d * 24))} h`;
     return ru ? `истёк ${Math.ceil(-d)} дн. назад` : `expired ${Math.ceil(-d)} d ago`;
   }
+  // Оранжевым — прокси, которым осталось 3 дня и меньше (как в колонке
+  // «Осталось»: 3 дня 20 часов — ещё «3 дн.»).
+  const SOON_DAYS = 3;
+  const endsSoon = p => p.state === 'active' && Math.floor(p.days_left) <= SOON_DAYS;
   function stateClass(p) {
     if (p.state !== 'active') return p.state || 'gone';
-    return p.days_left < data.grace_days ? 'soon' : '';
+    return endsSoon(p) ? 'soon' : '';
   }
-  // Истекающие — те, что закончатся в ближайшие grace_days дней, и уже истёкшие.
-  const expiring = p => p.state === 'grace' || (p.state === 'active' && p.days_left < data.grace_days);
+  // Истекающие — оранжевые и уже истёкшие.
+  const expiring = p => p.state === 'grace' || endsSoon(p);
 
   function show(message, cls) {
     const el = $('message');
@@ -149,6 +153,7 @@
           if (i === 4) td.className = 'lists muted';
           tr.append(td);
         });
+        if (endsSoon(p)) tr.className = 'soon';
         table.append(tr);
       }
       box.append(table);
