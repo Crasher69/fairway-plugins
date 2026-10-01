@@ -18,7 +18,7 @@ import (
 // Prefixes — id прокси, которыми владеют плагины этого репо. Такие прокси
 // принадлежат своему плагину, и чужой плагин их не забирает, даже если
 // адрес совпал.
-var Prefixes = []string{"spaceproxy-", "proxy6-"}
+var Prefixes = []string{"spaceproxy-", "proxy6-", "proxys-"}
 
 // Owned — прокси принадлежит какому-то плагину из Prefixes.
 func Owned(id string) bool {
